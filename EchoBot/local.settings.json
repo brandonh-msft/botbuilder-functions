@@ -1,0 +1,10 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "AzureWebJobsDashboard": "UseDevelopmentStorage=true",
+
+    "MS_APP_ID": "", // <your app id here>
+    "MS_APP_PASSWORD": "" // <your app pwd here>
+  }
+}
