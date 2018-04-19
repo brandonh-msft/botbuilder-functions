@@ -39,7 +39,7 @@ namespace Microsoft.Bot.Samples.AzureFunction
             var activity = JsonConvert.DeserializeObject<Activity>(requestBody);
             try
             {
-                await _botAdapter.ProcessActivity(req.Headers[@"Authentication"].FirstOrDefault(), activity, BotLogic);
+                await _botAdapter.ProcessActivity(req.Headers[@"Authorization"].FirstOrDefault(), activity, BotLogic);
 
                 return new OkResult();
             }
