@@ -10,8 +10,7 @@ using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.Azure.WebJobs.Host;
 using Microsoft.Bot.Builder;
 using Microsoft.Bot.Builder.Adapters;
-using Microsoft.Bot.Builder.Middleware;
-using Microsoft.Bot.Builder.Storage;
+using Microsoft.Bot.Builder.Core.Extensions;
 using Microsoft.Bot.Schema;
 using Newtonsoft.Json;
 
@@ -19,15 +18,15 @@ namespace Microsoft.Bot.Samples.AzureFunction
 {
     public static class EchoBot
     {
-        private static readonly BotFrameworkAdapter _myBot;
+        private static readonly BotFrameworkAdapter _botAdapter;
 
         static EchoBot()
         {
             var appId = Environment.GetEnvironmentVariable(@"MS_APP_ID");
             var pwd = Environment.GetEnvironmentVariable(@"MS_APP_PASSWORD");
 
-            _myBot = new BotFrameworkAdapter(appId, pwd)
-                .Use(new ConversationStateManagerMiddleware(new MemoryStorage()));
+            _botAdapter = new BotFrameworkAdapter(appId, pwd)
+                .Use(new ConversationState<EchoBotState>(new MemoryStorage()));
         }
 
         [FunctionName("messages")]
@@ -40,7 +39,7 @@ namespace Microsoft.Bot.Samples.AzureFunction
             var activity = JsonConvert.DeserializeObject<Activity>(requestBody);
             try
             {
-                await _myBot.ProcessActivty(req.Headers[@"Authentication"].FirstOrDefault(), activity, BotLogic);
+                await _botAdapter.ProcessActivity(req.Headers[@"Authentication"].FirstOrDefault(), activity, BotLogic);
 
                 return new OkResult();
             }
@@ -50,26 +49,30 @@ namespace Microsoft.Bot.Samples.AzureFunction
             }
         }
 
-        private static Task BotLogic(IBotContext arg)
+        private static async Task BotLogic(ITurnContext turnContext)
         {
-            if (arg.Request.Type == ActivityTypes.Message)
+            if (turnContext.Activity.Type == ActivityTypes.Message)
             {
-                var turnNumber = (int)(arg.State.ConversationProperties[@"turnNumber"] ?? 1);
+                var botState = turnContext.GetConversationState<EchoBotState>();
 
-                var msg = arg.Request.AsMessageActivity();
-                arg.Reply($@"[#{turnNumber++}]: You said {msg.Text}");
-                arg.State.ConversationProperties[@"turnNumber"] = turnNumber;
+                botState.TurnNumber++;
+
+                var msg = turnContext.Activity.AsMessageActivity();
+                await turnContext.SendActivity($@"[#{botState.TurnNumber}]: You said {msg.Text}");
             }
-            else if (arg.Request.Type == ActivityTypes.ConversationUpdate)
+            else if (turnContext.Activity.Type == ActivityTypes.ConversationUpdate)
             {
-                var cUpdate = arg.Request.AsConversationUpdateActivity();
-                foreach (var m in cUpdate.MembersAdded.Where(a => a.Id != arg.Request.Recipient.Id))
+                var cUpdate = turnContext.Activity.AsConversationUpdateActivity();
+                foreach (var m in cUpdate.MembersAdded.Where(a => a.Id != turnContext.Activity.Recipient.Id))
                 {
-                    arg.Reply($@"Welcome to the echo bot, {m.Name}. Say something and I'll echo it back.");
+                    await turnContext.SendActivity($@"Welcome to the echo bot, {m.Name}. Say something and I'll echo it back.");
                 }
             }
+        }
 
-            return Task.CompletedTask;
+        private sealed class EchoBotState
+        {
+            public int TurnNumber { get; set; }
         }
     }
 }
